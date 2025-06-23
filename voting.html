@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Voting - Noir Writing Award</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #1a1a2e, #2a0845);
+      color: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+
+    h1, h2 {
+      color: #caa9ff;
+    }
+
+    .kategori {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #2d2b4e;
+      border-radius: 12px;
+    }
+
+    button {
+      display: block;
+      margin: 10px auto;
+      padding: 10px 15px;
+      background-color: #caa9ff;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #a678f0;
+    }
+
+    #leaderboard {
+      margin-top: 40px;
+      background: #282644;
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    .alert {
+      margin-top: 20px;
+      color: yellow;
+    }
+
+    #loadingMessage {
+      font-size: 24px;
+      color: #caa9ff;
+      margin-top: 100px;
+      animation: glow 1.8s ease-in-out infinite;
+    }
+
+    @keyframes glow {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    #votingArea, #leaderboard, #alertBox {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Voting Noir Writing Award</h1>
+<h2 id="statusVote">Memuat status voting...</h2>
+
+<div id="loadingMessage">VOTES BELUM DIBUKA</div>
+
+<div id="votingArea"></div>
+
+<div id="leaderboard">
+  <h2>Leaderboard</h2>
+  <div id="boardData"></div>
+</div>
+
+<div class="alert" id="alertBox"></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+  import {
+    getDatabase, ref, onValue, update, push
+  } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC-KyMTRfaVvVs0ulwGG4Bj-TIBVkDuwJM",
+    authDomain: "noir-writing-award-votes-new.firebaseapp.com",
+    databaseURL: "https://noir-writing-award-votes-new-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "noir-writing-award-votes-new",
+    storageBucket: "noir-writing-award-votes-new.firebasestorage.app",
+    messagingSenderId: "1081754481206",
+    appId: "1:1081754481206:web:2cbcc35840434cfd059e97"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  const votingArea = document.getElementById("votingArea");
+  const alertBox = document.getElementById("alertBox");
+  const statusVote = document.getElementById("statusVote");
+  const boardData = document.getElementById("boardData");
+  const loadingMessage = document.getElementById("loadingMessage");
+  const leaderboardDiv = document.getElementById("leaderboard");
+
+  let statusVoting = false;
+
+  // Ambil status voting dari Firebase
+  onValue(ref(db, "status/votingOpen"), (snap) => {
+    statusVoting = snap.val();
+    if (statusVoting) {
+      statusVote.innerText = "🟢 Voting Dibuka";
+      loadingMessage.style.display = "none";
+      votingArea.style.display = "block";
+      leaderboardDiv.style.display = "block";
+      alertBox.style.display = "block";
+      tampilkanVoting();
+      tampilkanLeaderboard();
+    } else {
+      statusVote.innerText = "🔴 Voting Belum Dibuka";
+      loadingMessage.style.display = "block";
+      votingArea.style.display = "none";
+      leaderboardDiv.style.display = "none";
+      alertBox.style.display = "none";
+    }
+  });
+
+  function tampilkanVoting() {
+    onValue(ref(db, "votes"), (snapshot) => {
+      votingArea.innerHTML = "";
+      snapshot.forEach((kategoriSnap) => {
+        const kategori = kategoriSnap.key;
+        const kategoriDiv = document.createElement("div");
+        kategoriDiv.className = "kategori";
+        kategoriDiv.innerHTML = `<h3>${kategori}</h3>`;
+        kategoriSnap.forEach((nomSnap) => {
+          const data = nomSnap.val();
+          const id = nomSnap.key;
+          const nama = data.nama || "[Tanpa Nama]";
+          kategoriDiv.innerHTML += `<button onclick="vote('${kategori}', '${id}', '${nama.replaceAll("'", "\\'")}')">${nama}</button>`;
+        });
+        votingArea.appendChild(kategoriDiv);
+      });
+    });
+  }
+
+  function tampilkanLeaderboard() {
+    onValue(ref(db, "votes"), (snap) => {
+      boardData.innerHTML = "";
+      snap.forEach((cat) => {
+        const kategori = cat.key;
+        let html = `<h3>${kategori}</h3><ul>`;
+        cat.forEach((nom) => {
+          const data = nom.val();
+          html += `<li>${data.nama} - <b>${data.jumlah}</b> vote</li>`;
+        });
+        html += "</ul>";
+        boardData.innerHTML += html;
+      });
+    });
+  }
+
+  window.vote = async (kategori, id, nama) => {
+    const ip = await fetch("https://api.ipify.org?format=json").then(r => r.json()).then(d => d.ip);
+    const key = `vote_${kategori}_${ip}`;
+    const lastVote = localStorage.getItem(key);
+    const now = Date.now();
+
+    if (lastVote && now - lastVote < 86400000) {
+      alertBox.innerText = "Kamu sudah voting di kategori ini. Tunggu 24 jam!";
+      return;
+    }
+
+    const countRef = ref(db, `votes/${kategori}/${id}/jumlah`);
+    onValue(countRef, (snap) => {
+      const jumlah = snap.val() || 0;
+      update(ref(db, `votes/${kategori}/${id}`), {
+        jumlah: jumlah + 1
+      });
+    }, { onlyOnce: true });
+
+    push(ref(db, "riwayat"), {
+      ip: ip,
+      kategori,
+      nominasi: nama,
+      waktu: new Date().toISOString()
+    });
+
+    localStorage.setItem(key, now);
+    alertBox.innerText = "✅ Vote berhasil! Terima kasih!";
+  };
+</script>
+</body>
+</html>

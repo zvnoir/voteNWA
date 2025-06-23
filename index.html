@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Noir Writing Award - Login</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #1a1a2e, #16213e);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #fff;
+    }
+
+    .container {
+      background: #2e2e48;
+      padding: 40px;
+      border-radius: 15px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      width: 90%;
+      max-width: 400px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #e0e0ff;
+    }
+
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0 20px;
+      border: none;
+      border-radius: 8px;
+      background: #444;
+      color: white;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #6c5ce7;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background-color: #a29bfe;
+    }
+
+    .divider {
+      margin: 20px 0;
+      text-align: center;
+      color: #ccc;
+    }
+
+    .alt-button {
+      background-color: #333;
+    }
+
+    .alt-button:hover {
+      background-color: #555;
+    }
+
+    .note {
+      text-align: center;
+      font-size: 14px;
+      color: #aaa;
+      margin-top: 15px;
+    }
+
+    .error {
+      color: #ff7675;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Login Panitia</h1>
+    <div id="errorMsg" class="error"></div>
+
+    <input type="email" id="email" placeholder="Email Panitia" required />
+    <input type="password" id="password" placeholder="Password" required />
+    <button onclick="login()">Masuk</button>
+
+    <div class="divider">atau</div>
+    <a href="voting.html"><button class="alt-button">Masuk Sebagai Voter</button></a>
+
+    <div class="note">
+      Akun Panitia: <br>
+      auroranoir5@gmail.com • zvnoir253@gmail.com
+    </div>
+  </div>
+
+  <!-- Firebase Script -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC-KyMTRfaVvVs0ulwGG4Bj-TIBVkDuwJM",
+      authDomain: "noir-writing-award-votes-new.firebaseapp.com",
+      databaseURL: "https://noir-writing-award-votes-new-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "noir-writing-award-votes-new",
+      storageBucket: "noir-writing-award-votes-new.firebasestorage.app",
+      messagingSenderId: "1081754481206",
+      appId: "1:1081754481206:web:2cbcc35840434cfd059e97"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    window.login = () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const errorMsg = document.getElementById("errorMsg");
+
+      signInWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+          const user = userCredential.user;
+          localStorage.setItem("panitia", email);
+          window.location.href = "dashboard.html";
+        })
+        .catch((error) => {
+          errorMsg.innerText = "Login gagal: " + error.message;
+        });
+    };
+  </script>
+</body>
+</html>
