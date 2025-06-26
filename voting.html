@@ -77,6 +77,12 @@
     #votingArea, #leaderboard, #alertBox {
       display: none;
     }
+
+    .sisa {
+      margin-top: 5px;
+      font-size: 14px;
+      color: #ffd700;
+    }
   </style>
 </head>
 <body>
@@ -121,7 +127,15 @@
   const loadingMessage = document.getElementById("loadingMessage");
   const leaderboardDiv = document.getElementById("leaderboard");
 
+  let ipAddress = "";
   let statusVoting = false;
+
+  // Ambil IP
+  fetch("https://api.ipify.org?format=json")
+    .then(r => r.json())
+    .then(data => {
+      ipAddress = data.ip;
+    });
 
   // Ambil status voting dari Firebase
   onValue(ref(db, "status/votingOpen"), (snap) => {
@@ -151,15 +165,77 @@
         const kategoriDiv = document.createElement("div");
         kategoriDiv.className = "kategori";
         kategoriDiv.innerHTML = `<h3>${kategori}</h3>`;
+
         kategoriSnap.forEach((nomSnap) => {
           const data = nomSnap.val();
           const id = nomSnap.key;
           const nama = data.nama || "[Tanpa Nama]";
-          kategoriDiv.innerHTML += `<button onclick="vote('${kategori}', '${id}', '${nama.replaceAll("'", "\\'")}')">${nama}</button>`;
+          const btnId = `btn_${kategori}_${id}`;
+
+          kategoriDiv.innerHTML += `
+            <button id="${btnId}">${nama}</button>
+          `;
         });
+
+        kategoriDiv.innerHTML += `<div class="sisa" id="sisa_${kategori}">Memuat sisa vote...</div>`;
         votingArea.appendChild(kategoriDiv);
+        cekSisaVote(kategori);
+      });
+
+      // Bind tombol vote
+      votingArea.querySelectorAll("button").forEach(btn => {
+        btn.onclick = () => {
+          const [_, kategori, id] = btn.id.split("_");
+          const nama = btn.innerText;
+          prosesVote(kategori, id, nama);
+        };
       });
     });
+  }
+
+  function cekSisaVote(kategori) {
+    const key = `votes_${kategori}_${ipAddress}`;
+    const stored = JSON.parse(localStorage.getItem(key)) || [];
+    const now = Date.now();
+    const recentVotes = stored.filter(v => now - v < 86400000);
+    const sisa = 4 - recentVotes.length;
+    document.getElementById(`sisa_${kategori}`).innerText = `Sisa jatah vote: ${sisa}`;
+  }
+
+  function prosesVote(kategori, id, nama) {
+    const key = `votes_${kategori}_${ipAddress}`;
+    const now = Date.now();
+    const stored = JSON.parse(localStorage.getItem(key)) || [];
+    const recentVotes = stored.filter(v => now - v < 86400000);
+
+    if (recentVotes.length >= 4) {
+      alertBox.innerText = `❌ Kamu sudah menggunakan semua jatah (4 vote) di kategori ${kategori} hari ini.`;
+      return;
+    }
+
+    // Tambahkan vote
+    const jumlahRef = ref(db, `votes/${kategori}/${id}/jumlah`);
+    onValue(jumlahRef, (snap) => {
+      const jumlah = snap.val() || 0;
+      update(ref(db, `votes/${kategori}/${id}`), {
+        jumlah: jumlah + 1
+      });
+    }, { onlyOnce: true });
+
+    // Simpan riwayat ke Firebase
+    push(ref(db, "riwayat"), {
+      ip: ipAddress,
+      kategori,
+      nominasi: nama,
+      waktu: new Date().toISOString()
+    });
+
+    // Simpan ke localStorage
+    stored.push(now);
+    localStorage.setItem(key, JSON.stringify(stored));
+
+    alertBox.innerText = `✅ Vote untuk "${nama}" di kategori "${kategori}" berhasil!`;
+    cekSisaVote(kategori);
   }
 
   function tampilkanLeaderboard() {
@@ -177,36 +253,6 @@
       });
     });
   }
-
-  window.vote = async (kategori, id, nama) => {
-    const ip = await fetch("https://api.ipify.org?format=json").then(r => r.json()).then(d => d.ip);
-    const key = `vote_${kategori}_${ip}`;
-    const lastVote = localStorage.getItem(key);
-    const now = Date.now();
-
-    if (lastVote && now - lastVote < 86400000) {
-      alertBox.innerText = "Kamu sudah voting di kategori ini. Tunggu 24 jam!";
-      return;
-    }
-
-    const countRef = ref(db, `votes/${kategori}/${id}/jumlah`);
-    onValue(countRef, (snap) => {
-      const jumlah = snap.val() || 0;
-      update(ref(db, `votes/${kategori}/${id}`), {
-        jumlah: jumlah + 1
-      });
-    }, { onlyOnce: true });
-
-    push(ref(db, "riwayat"), {
-      ip: ip,
-      kategori,
-      nominasi: nama,
-      waktu: new Date().toISOString()
-    });
-
-    localStorage.setItem(key, now);
-    alertBox.innerText = "✅ Vote berhasil! Terima kasih!";
-  };
 </script>
 </body>
 </html>
