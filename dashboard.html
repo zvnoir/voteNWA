@@ -12,95 +12,71 @@
       margin: 0;
       padding: 20px;
     }
-
     h1, h2 {
       text-align: center;
       color: #caa9ff;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 40px;
     }
-
     th, td {
       border: 1px solid #555;
       padding: 10px;
       text-align: left;
       background-color: #2d2b4e;
     }
-
     th {
       background-color: #3e2f61;
     }
-
     tr:nth-child(even) td {
       background-color: #282644;
     }
-
     select, input[type="text"], button {
       padding: 10px;
       border: none;
       border-radius: 8px;
       margin: 10px 5px;
     }
-
     select, input[type="text"] {
-      width: 200px;
+      width: 220px;
     }
-
     button {
       background-color: #caa9ff;
       color: #1a1a2e;
       cursor: pointer;
     }
-
     button:hover {
       background-color: #a678f0;
     }
-
     .hapusBtn {
       background-color: #e74c3c;
       color: white;
       padding: 5px 10px;
-      border: none;
       border-radius: 5px;
       margin-left: 10px;
-      cursor: pointer;
     }
-
     .hapusBtn:hover {
       background-color: #c0392b;
     }
-
     .section {
       margin: 40px 0;
     }
-
     ul {
       list-style: none;
       padding: 0;
     }
-
-    .status-voting {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-
     .logout {
       position: fixed;
       top: 10px;
       right: 10px;
       background: #555;
       color: white;
-      border: none;
-      border-radius: 5px;
       padding: 8px 14px;
+      border-radius: 5px;
       font-weight: bold;
-      cursor: pointer;
     }
-
     .logout:hover {
       background: #333;
     }
@@ -120,9 +96,9 @@
 <h1>Dashboard Panitia</h1>
 <p style="text-align:center;">Halo, <b><span id="panitiaName"></span></b></p>
 
-<div class="section status-voting">
+<div class="section">
   <h2>Status Voting: <span id="statusVoting">...</span></h2>
-  <button id="triggerBtn" onclick="toggleVoting()">Trigger Voting</button>
+  <button id="triggerVoting">Trigger Voting</button>
 </div>
 
 <div class="section">
@@ -131,8 +107,8 @@
     <option value="Author Angst Terfavorit">Author Angst Terfavorit</option>
     <option value="AU Dengan Narasi Terbaik">AU Dengan Narasi Terbaik</option>
   </select>
-  <input type="text" id="nominasiInput" placeholder="Nama nominasi" />
-  <button onclick="tambahNominasi()">Tambah</button>
+  <input type="text" id="nominasiInput" placeholder="Nama nominasi">
+  <button id="tambahBtn">Tambah</button>
 </div>
 
 <div class="section">
@@ -142,7 +118,7 @@
 
 <div class="section">
   <h2>Riwayat Voting</h2>
-  <table id="riwayatTable">
+  <table>
     <thead>
       <tr>
         <th>IP</th>
@@ -158,7 +134,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
   import {
-    getDatabase, ref, onValue, update, push, remove
+    getDatabase, ref, onValue, push, remove, update
   } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-database.js";
 
   const firebaseConfig = {
@@ -176,46 +152,38 @@
 
   document.getElementById("panitiaName").innerText = localStorage.getItem("panitia");
 
-  // Status Voting
   const statusRef = ref(db, "status/votingOpen");
   const statusSpan = document.getElementById("statusVoting");
-  const triggerBtn = document.getElementById("triggerBtn");
-  let statusSekarang = false;
+  let statusVoting = false;
 
-  onValue(statusRef, (snap) => {
-    statusSekarang = snap.val();
-    statusSpan.innerText = statusSekarang ? "🟢 Dibuka" : "🔴 Ditutup";
-    triggerBtn.innerText = statusSekarang ? "Tutup Voting" : "Buka Voting";
+  onValue(statusRef, (snapshot) => {
+    statusVoting = snapshot.val();
+    statusSpan.textContent = statusVoting ? "🟢 Dibuka" : "🔴 Ditutup";
+    document.getElementById("triggerVoting").textContent = statusVoting ? "Tutup Voting" : "Buka Voting";
   });
 
-  function toggleVoting() {
-    update(ref(db, "status"), { votingOpen: !statusSekarang });
-  }
+  document.getElementById("triggerVoting").addEventListener("click", () => {
+    update(ref(db, "status"), { votingOpen: !statusVoting });
+  });
 
-  // Tambah Nominasi
-  function tambahNominasi() {
+  document.getElementById("tambahBtn").addEventListener("click", () => {
     const kategori = document.getElementById("kategoriSelect").value;
     const nama = document.getElementById("nominasiInput").value.trim();
-    if (!nama) return alert("Isi nama nominasi terlebih dahulu.");
-    push(ref(db, "votes/" + kategori), {
-      nama: nama,
-      jumlah: 0
-    });
+    if (!nama) return alert("Nama nominasi belum diisi.");
+    push(ref(db, "votes/" + kategori), { nama, jumlah: 0 });
     document.getElementById("nominasiInput").value = "";
-  }
+  });
 
-  // Leaderboard + Hapus
   const leaderboardDiv = document.getElementById("leaderboard");
   onValue(ref(db, "votes"), (snapshot) => {
     leaderboardDiv.innerHTML = "";
-    snapshot.forEach((cat) => {
-      const category = cat.key;
-      let html = `<h3>${category}</h3><ul>`;
-      cat.forEach((nom) => {
-        const data = nom.val();
-        const id = nom.key;
-        html += `<li>${data.nama} - <b>${data.jumlah}</b> vote 
-          <button class="hapusBtn" onclick="hapusNominasi('${category}', '${id}')">Hapus</button></li>`;
+    snapshot.forEach((kategoriSnap) => {
+      const kategori = kategoriSnap.key;
+      let html = `<h3>${kategori}</h3><ul>`;
+      kategoriSnap.forEach((nominasiSnap) => {
+        const data = nominasiSnap.val();
+        html += `<li>${data.nama} - <b>${data.jumlah}</b> vote
+          <button class="hapusBtn" onclick="hapusNominasi('${kategori}', '${nominasiSnap.key}')">Hapus</button></li>`;
       });
       html += "</ul>";
       leaderboardDiv.innerHTML += html;
@@ -223,16 +191,15 @@
   });
 
   window.hapusNominasi = (kategori, id) => {
-    if (confirm("Yakin ingin menghapus nominasi ini?")) {
+    if (confirm("Hapus nominasi ini?")) {
       remove(ref(db, `votes/${kategori}/${id}`));
     }
   };
 
-  // Riwayat Voting
   const riwayatBody = document.getElementById("riwayatBody");
-  onValue(ref(db, "riwayat"), (snap) => {
+  onValue(ref(db, "riwayat"), (snapshot) => {
     riwayatBody.innerHTML = "";
-    snap.forEach((item) => {
+    snapshot.forEach((item) => {
       const d = item.val();
       const row = document.createElement("tr");
       row.innerHTML = `
@@ -245,11 +212,11 @@
     });
   });
 
-  // Logout
   window.logout = () => {
     localStorage.removeItem("panitia");
     window.location.href = "index.html";
   };
 </script>
+
 </body>
 </html>
